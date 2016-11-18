@@ -19,6 +19,6 @@
   "dependencies": {
     "promise": ">=7.1.1",
     "moment": ">=2.4.0",
-    "net-socket": "v1.0.0"
+    "net-socket": "homespun/net-socket"
   }
 }
