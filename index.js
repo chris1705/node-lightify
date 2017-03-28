@@ -35,7 +35,19 @@ function create_command(cmd, body, flag) {
 
 function start(ip, onError) {
   return new Promise(function(resolve, reject) {
-    client = net.connect(4000, ip);
+    var connectTimer;
+
+    var connectionListener = function () {
+      clearTimeout(connectTimer);
+      resolve();
+    };
+    
+    try {
+      client = net.connect(4000, ip, connectionListener);
+    } catch (ex) {
+      reject(ex.toString());
+      return console.log(ex.stack);
+    }
     connectTimer = setTimeout(function() {
       reject('timeout');
       client.destroy();
@@ -58,14 +70,6 @@ function start(ip, onError) {
         onError(error);
       }
     });
-
-    client.on('connect', () => {
-      console.log("CONN");
-      clearTimeout(connectTimer);
-      resolve();
-    });
-
-
   });
 }
 
@@ -78,7 +82,9 @@ function responseProcesser(data, status_len, single_result_cb) {
   results = [];
   for (var i = 0; i < num; i++) {
     var pos = 11 + i * status_len;
-    results.push(single_result_cb(pos));
+    var result = single_result_cb(pos);
+
+    if (result) results.push(result);
   }
   return results;
 }
@@ -112,23 +118,26 @@ function discovery() {
               break;
             }
           }
-          return {
-            id: data.readUInt16LE(pos),
-            mac: data.readDoubleLE(pos + 2, 8),
-            type: data.readUInt8(pos + 10),
-            firmware_version: data.readUInt32BE(pos + 11),
-            online: data.readUInt8(pos + 15),
-            groupid: data.readUInt16LE(pos + 16),
-            status: data.readUInt8(pos + 18), // 0 == off, 1 == on
-            brightness: data.readUInt8(pos + 19),
-            temperature: data.readUInt16LE(pos + 20),
-            red: data.readUInt8(pos + 22),
-            green: data.readUInt8(pos + 23),
-            blue: data.readUInt8(pos + 24),
-            alpha: data.readUInt8(pos + 25),
-            name: data.toString('utf-8', pos + 26, j)
-          };
-
+          try {
+            return {
+              id: data.readUInt16LE(pos),
+              mac: data.readDoubleLE(pos + 2, 8),
+              type: data.readUInt8(pos + 10),
+              firmware_version: data.readUInt32BE(pos + 11),
+              online: data.readUInt8(pos + 15),
+              groupid: data.readUInt16LE(pos + 16),
+              status: data.readUInt8(pos + 18), // 0 == off, 1 == on
+              brightness: data.readUInt8(pos + 19),
+              temperature: data.readUInt16LE(pos + 20),
+              red: data.readUInt8(pos + 22),
+              green: data.readUInt8(pos + 23),
+              blue: data.readUInt8(pos + 24),
+              alpha: data.readUInt8(pos + 25),
+              name: data.toString('utf-8', pos + 26, j)
+            };
+          } catch (ex) {
+            // no good way to convey this to caller...
+          }
         });
         if (result instanceof Array) {
           resolve({
@@ -251,6 +260,10 @@ function isPlug(type) {
   return type === 16;
 }
 
+function isSensor(type) {
+  return type === 32;
+}
+
 function getNodeType(type) {
   return isPlug(type) ? 16 : type;
 }
@@ -268,6 +281,7 @@ var exports = module.exports = {
   node_color: node_color,
   isPlug: isPlug,
   isSwitch: isSwitch,
+  isSensor : isSensor,
   is2BSwitch: function(type) {
     return type === 64;
   },
@@ -285,6 +299,6 @@ var exports = module.exports = {
     return getNodeType(type) === 10 || getNodeType(type) === 8;
   },
   isLight: function(type) {
-    return !isSwitch(type) && !isPlug(type);
+    return !isSwitch(type) && !isPlug(type) && !isSensor(type);
   }
 };
