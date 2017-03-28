@@ -35,7 +35,20 @@ function create_command(cmd, body, flag) {
 
 function start(ip, onError) {
   return new Promise(function(resolve, reject) {
-    client = net.connect(4000, ip);
+    var connectTimer;
+
+    var connectionListener = function () {
+      console.log("CONN");
+      clearTimeout(connectTimer);
+      resolve();
+    };
+    
+    try {
+      client = net.connect(4000, ip, connectionListener);
+    } catch (ex) {
+      reject(ex.toString());
+      return console.log(ex.stack);
+    }
     connectTimer = setTimeout(function() {
       reject('timeout');
       client.destroy();
@@ -58,14 +71,6 @@ function start(ip, onError) {
         onError(error);
       }
     });
-
-    client.on('connect', () => {
-      console.log("CONN");
-      clearTimeout(connectTimer);
-      resolve();
-    });
-
-
   });
 }
 
